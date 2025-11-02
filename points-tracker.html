@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Points Tracker</title>
+<style>
+  body { font-family: sans-serif; background:#f8f9fa; color:#333; padding:1rem; }
+  h1 { text-align:center; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:1rem; }
+  button {
+    padding:10px; border:none; border-radius:6px; cursor:pointer;
+    font-size:14px; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,.1);
+  }
+  button.negative { background:#ffd4d4; }
+  button.positive { background:#d8ffd8; }
+  .section-title { margin-top:1.5rem; font-weight:bold; }
+  .score { font-size:1.5rem; text-align:center; margin-top:1rem; }
+  #resetBtn { margin-top:1rem; background:#ffcccc; }
+</style>
+</head>
+<body>
+
+<h1>🏅 My Points Tracker</h1>
+
+<div class="score">Current Points: <span id="points">0</span></div>
+<div class="score">This Week: <span id="weekPoints">0</span></div>
+
+<div class="section-title">Negative actions</div>
+<div class="grid" id="negativeActions"></div>
+
+<div class="section-title">Positive actions</div>
+<div class="grid" id="positiveActions"></div>
+
+<button id="resetBtn">Reset All Data</button>
+
+<script>
+const actions = [
+  { name: "Smoke", points: -3, goal: 0 },
+  { name: "Being Late", points: -10, goal: 0 },
+  { name: "Procrastinate", points: -10, goal: 0 },
+  { name: "Weed", points: -20, goal: 0 },
+  { name: "Miss Weekly Goal", points: -5, goal: 0 },
+  { name: "Breakfast", points: 3, goal: 5 },
+  { name: "Teeth", points: 2, goal: 5 },
+  { name: "Shower", points: 1, goal: 5 },
+  { name: "Sport", points: 10, goal: 3 },
+  { name: "Laundry", points: 5, goal: 1 },
+  { name: "Cook", points: 4, goal: 3 },
+  { name: "Reading", points: 5, goal: 3 },
+  { name: "Film", points: 5, goal: 2 },
+  { name: "Langue", points: 7, goal: 2 },
+];
+
+const STORAGE_KEY = "pointsTracker_v1";
+
+// ---------- STORAGE ----------
+function loadData() {
+  const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  if (!data.entries) data.entries = [];
+  return data;
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// ---------- HELPERS ----------
+function getWeekId(date = new Date()) {
+  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+  const dayOfYear = Math.floor((date - firstDayOfYear) / (1000*60*60*24)) + 1;
+  const weekNumber = Math.ceil(dayOfYear / 7);
+  return `${date.getFullYear()}-W${weekNumber}`;
+}
+
+// ---------- STATE ----------
+let data = loadData();
+
+// ---------- LOG ACTION ----------
+function logAction(action) {
+  const entry = { name: action.name, points: action.points, date: Date.now(), week: getWeekId() };
+  data.entries.push(entry);
+  saveData(data);
+  updateDisplay();
+}
+
+// ---------- CALCULATIONS ----------
+function calculateTotals() {
+  const total = data.entries.reduce((sum,e)=>sum+e.points,0);
+  const currentWeek = getWeekId();
+  const weekEntries = data.entries.filter(e=>e.week===currentWeek);
+  const weekTotal = weekEntries.reduce((sum,e)=>sum+e.points,0);
+
+  const bonuses = actions.filter(a=>a.goal>0).map(a=>{
+    const count = weekEntries.filter(e=>e.name===a.name).length;
+    return (count >= a.goal) ? 10 : 0;
+  });
+  const bonusTotal = bonuses.reduce((a,b)=>a+b,0);
+
+  return { total, weekTotal, bonusTotal };
+}
+
+// ---------- DISPLAY ----------
+function updateDisplay() {
+  const { total, weekTotal, bonusTotal } = calculateTotals();
+  document.getElementById("points").textContent = total;
+  document.getElementById("weekPoints").textContent = weekTotal + bonusTotal;
+}
+
+// ---------- UI CREATION ----------
+function makeButtons() {
+  const negDiv = document.getElementById("negativeActions");
+  const posDiv = document.getElementById("positiveActions");
+  actions.forEach(a=>{
+    const btn = document.createElement("button");
+    btn.textContent = `${a.name} (${a.points>0?'+':''}${a.points})`;
+    btn.className = a.points>0 ? "positive" : "negative";
+    btn.onclick = ()=>logAction(a);
+    (a.points>0?posDiv:negDiv).appendChild(btn);
+  });
+}
+
+// ---------- RESET ----------
+document.getElementById("resetBtn").onclick = () => {
+  if(confirm("Are you sure you want to reset all data?")) {
+    localStorage.removeItem(STORAGE_KEY);
+    data = { entries: [] };
+    updateDisplay();
+  }
+}
+
+// Initialize
+makeButtons();
+updateDisplay();
+</script>
+</body>
+</html>
